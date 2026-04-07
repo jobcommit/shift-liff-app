@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>シフト申請</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <style>
+        body { font-family: -apple-system, sans-serif; padding: 20px; background-color: #f4f7f6; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h2 { color: #06C755; font-size: 1.2rem; margin-bottom: 20px; }
+        label { display: block; margin-top: 15px; font-size: 0.9rem; color: #666; }
+        input, select { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+        .btn { width: 100%; padding: 15px; background: #06C755; color: white; border: none; border-radius: 8px; margin-top: 25px; font-size: 18px; font-weight: bold; cursor: pointer; }
+        #displayName { font-weight: bold; color: #333; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>シフト申請フォーム</h2>
+        <div style="margin-bottom: 20px; padding: 10px; background: #e9f7ef; border-radius: 8px;">
+            <span style="font-size: 0.8rem; color: #666;">ログインユーザー:</span>
+            <div id="displayName">取得中...</div>
+        </div>
+
+        <label>勤務日</label>
+        <input type="text" id="targetDate" placeholder="カレンダーから選択">
+
+        <label>勤務時間</label>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <input type="time" id="startTime" value="10:00">
+            <span>〜</span>
+            <input type="time" id="endTime" value="19:30">
+        </div>
+
+        <button class="btn" onclick="submitShift()">申請する</button>
+    </div>
+
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
+    <script>
+        // LIFF IDのプレースホルダ（GASで置換される）
+        const MY_LIFF_ID = "あなたのLIFF_ID";
+
+        flatpickr("#targetDate", { locale: "ja", dateFormat: "Y/m/d", minDate: "today" });
+
+        liff.init({ liffId: MY_LIFF_ID }).then(() => {
+            if (!liff.isLoggedIn()) { liff.login(); }
+            else {
+                liff.getProfile().then(profile => {
+                    document.getElementById('displayName').innerText = profile.displayName + " さん";
+                });
+            }
+        });
+
+        function submitShift() {
+            const date = document.getElementById('targetDate').value;
+            const start = document.getElementById('startTime').value;
+            const end = document.getElementById('endTime').value;
+            if (!date) { alert("日付を入力してください"); return; }
+
+            const message = `【シフト申請】\n日付:${date}\n時間:${start}-${end}`;
+            liff.sendMessages([{ type: 'text', text: message }]).then(() => {
+                liff.closeWindow();
+            }).catch(err => alert("エラー: " + err));
+        }
+    </script>
+</body>
+</html>
