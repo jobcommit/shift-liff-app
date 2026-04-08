@@ -1,1 +1,105 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>シフト申請フォーム</title>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <style>
+    body { 
+      font-family: "Helvetica Neue", Arial, sans-serif; 
+      margin: 0; padding: 20px 15px;
+      background-color: #e6f2ff; /* 薄い水色 */
+      color: #333;
+    }
+    .container { 
+      max-width: 450px; margin: auto; 
+      background: #ffffff; padding: 30px 20px; 
+      border-radius: 16px; 
+      box-shadow: 0 10px 25px rgba(0, 86, 210, 0.1);
+    }
+    h2 { text-align: center; color: #0056d2; margin-bottom: 25px; font-size: 1.4rem; }
+    .field { margin-bottom: 20px; }
+    label { display: block; font-weight: 600; margin-bottom: 8px; color: #444; }
+    input { 
+      width: 100%; padding: 14px; border: 1px solid #c2d1e5; 
+      border-radius: 8px; box-sizing: border-box; font-size: 16px; 
+    }
+    .time-group { display: flex; gap: 10px; align-items: center; }
+    button { 
+      width: 100%; padding: 16px; background: #0056d2; color: white; 
+      border: none; border-radius: 30px; font-size: 17px; font-weight: bold; 
+      cursor: pointer; margin-top: 15px; 
+    }
+    #loading { display: none; text-align: center; margin-top: 20px; color: #0056d2; font-weight: bold; }
+  </style>
+</head>
+<body>
 
+<div class="container">
+  <h2>シフト申請</h2>
+  <form id="shift-form">
+    <input type="hidden" id="userId">
+
+    <div class="field">
+      <label>勤務日</label>
+      <input type="text" id="targetDate" placeholder="タップして日付を選択" readonly>
+    </div>
+
+    <div class="field">
+      <label>勤務時間</label>
+      <div class="time-group">
+        <input type="time" id="startTime" value="10:00">
+        <span>〜</span>
+        <input type="time" id="endTime" value="19:30">
+      </div>
+    </div>
+
+    <button type="button" id="submitBtn" onclick="handleSubmit()">シフトを送信する</button>
+    <div id="loading">送信中...</div>
+  </form>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
+<script>
+  const MY_LIFF_ID = "あなたのLIFF_ID"; // ここを書き換える
+
+  window.onload = function() {
+    flatpickr("#targetDate", { locale: "ja", dateFormat: "Y/m/d", minDate: "today" });
+
+    liff.init({ liffId: MY_LIFF_ID })
+      .then(() => {
+        if (!liff.isLoggedIn()) {
+          liff.login();
+        } else {
+          document.getElementById('userId').value = liff.getContext().userId;
+        }
+      });
+  };
+
+  async function handleSubmit() {
+    const date = document.getElementById('targetDate').value;
+    const start = document.getElementById('startTime').value;
+    const end = document.getElementById('endTime').value;
+    const userId = document.getElementById('userId').value;
+
+    if (!date) { alert("日付を選択してください"); return; }
+
+    document.getElementById('submitBtn').disabled = true;
+    document.getElementById('loading').style.display = "block";
+
+    const message = `【シフト申請】\n日付:${date}\n時間:${start}-${end}`;
+
+    try {
+      await liff.sendMessages([{ type: 'text', text: message }]);
+      liff.closeWindow();
+    } catch (error) {
+      alert("エラーが発生しました: " + error);
+      document.getElementById('submitBtn').disabled = false;
+    }
+  }
+</script>
+</body>
+</html>
