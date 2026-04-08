@@ -12,7 +12,15 @@
     body { font-family: sans-serif; margin: 0; padding: 20px 15px; background-color: #e6f2ff; color: #333; }
     .container { max-width: 450px; margin: auto; background: #ffffff; padding: 25px 20px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
     h2 { text-align: center; color: #0056d2; margin-bottom: 20px; font-size: 1.4rem; }
-    .status-bar { background: #fff9c4; padding: 10px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 15px; text-align: center; color: #856404; display: none; }
+    .status-bar { background: #fff9c4; padding: 10px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 10px; text-align: center; color: #856404; display: none; }
+    
+    /* 申請済みリストのスタイル */
+    .shift-list-container { margin-top: 20px; border-top: 2px dashed #eee; padding-top: 15px; }
+    .shift-list-title { font-weight: bold; font-size: 0.9rem; margin-bottom: 10px; color: #0056d2; }
+    .shift-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f9f9f9; font-size: 0.85rem; }
+    .shift-date { font-weight: 600; }
+    .shift-val { color: #555; }
+
     .field { margin-bottom: 18px; }
     label { display: block; font-weight: 600; margin-bottom: 8px; color: #444; font-size: 0.9rem; }
     input, select { width: 100%; padding: 12px; border: 1px solid #c2d1e5; border-radius: 8px; box-sizing: border-box; font-size: 16px; background: #fff; }
@@ -52,25 +60,29 @@
     <div class="field">
       <label>勤務時間</label>
       <div class="time-flex">
-        <select id="startTime"><option value="">開始</option></select>
+        <select id="startTime"></select>
         <span>〜</span>
-        <select id="endTime"><option value="">終了</option></select>
+        <select id="endTime"></select>
       </div>
-      <div class="hint">※前月〜来月まで選択可。両方「空」で送信すると削除。</div>
     </div>
 
     <button type="button" class="main-btn" id="submitBtn" onclick="handleSubmit()">一括送信する</button>
     <div id="loading-overlay">送信中...</div>
   </form>
+
+  <div id="shift-list-area" class="shift-list-container" style="display:none;">
+    <div class="shift-list-title">【現在の申請状況】</div>
+    <div id="shift-items"></div>
+  </div>
 </div>
 
 <script>
-  // ★設定項目：自分のものに書き換えてください
   const MY_LIFF_ID = "2008904530-lXx8C9i5"; 
-  const GAS_URL = "あなたのGAS_ウェブアプリURL";
+  const GAS_URL = "あなたのGASウェブアプリURL";
   
   let fp; 
-  let submittedDates = [];
+  let submittedDates = []; // 日付のみ（カレンダー用）
+  let shiftDetails = [];   // 日付と内容のセット（リスト表示用）
 
   function setType(val) {
     document.getElementById('workType').value = val;
@@ -78,7 +90,6 @@
     document.getElementById('btn-remote').classList.toggle('active', val === 'リモート');
   }
 
-  // 15分刻みのプルダウン生成
   function createTimeOptions() {
     const startSelect = document.getElementById('startTime');
     const endSelect = document.getElementById('endTime');
@@ -91,7 +102,6 @@
         endSelect.add(new Option(timeStr, timeStr));
       }
     }
-    // 初期値セット
     startSelect.value = "10:00";
     endSelect.value = "19:30";
   }
@@ -129,12 +139,37 @@
     try {
       const response = await fetch(`${GAS_URL}?userId=${userId}`);
       const data = await response.json();
+      
+      // データ保存
       submittedDates = data.dates || [];
+      shiftDetails = data.details || []; // [{date: '2024/04/03', val: '13-17'}, ...]
+
       if (submittedDates.length > 0) {
         document.getElementById('status-bar').style.display = 'block';
         if(fp) fp.redraw();
+        renderShiftList();
       }
     } catch (err) { console.error(err); }
+  }
+
+  // リストを生成する関数
+  function renderShiftList() {
+    const area = document.getElementById('shift-list-area');
+    const container = document.getElementById('shift-items');
+    container.innerHTML = "";
+    
+    if (shiftDetails.length === 0) {
+      area.style.display = "none";
+      return;
+    }
+
+    area.style.display = "block";
+    shiftDetails.forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'shift-item';
+      div.innerHTML = `<span class="shift-date">${item.date}</span><span class="shift-val">${item.val}</span>`;
+      container.appendChild(div);
+    });
   }
 
   async function handleSubmit() {
