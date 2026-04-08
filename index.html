@@ -6,6 +6,8 @@
   <title>シフト管理システム</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
   <style>
     body { font-family: sans-serif; margin: 0; padding: 20px 15px; background-color: #e6f2ff; color: #333; }
     .container { max-width: 450px; margin: auto; background: #ffffff; padding: 25px 20px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
@@ -14,15 +16,11 @@
     .field { margin-bottom: 18px; }
     label { display: block; font-weight: 600; margin-bottom: 8px; color: #444; font-size: 0.9rem; }
     input { width: 100%; padding: 12px; border: 1px solid #c2d1e5; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
-    
     .type-selector { display: flex; gap: 10px; }
     .type-btn { flex: 1; padding: 12px; border: 1px solid #c2d1e5; background: #fff; border-radius: 8px; cursor: pointer; text-align: center; font-size: 14px; }
     .type-btn.active { background: #0056d2; color: #fff; border-color: #0056d2; font-weight: bold; }
-    
     .hint { font-size: 0.75rem; color: #666; margin-top: 5px; line-height: 1.4; }
     button.main-btn { width: 100%; padding: 16px; background: #0056d2; color: white; border: none; border-radius: 30px; font-size: 17px; font-weight: bold; margin-top: 20px; cursor: pointer; }
-    
-    /* カレンダーの色付け用CSS */
     .has-shift { background: #ffeb3b !important; border-radius: 50% !important; font-weight: bold !important; color: #000 !important; }
     #loading-overlay { display: none; text-align: center; padding: 10px; color: #0056d2; font-weight: bold; }
   </style>
@@ -39,7 +37,7 @@
 
     <div class="field">
       <label>勤務日（複数選択可）</label>
-      <input type="text" id="targetDate" placeholder="タップして日付を選択" readonly>
+      <input type="text" id="targetDate" placeholder="タップして日付を選択">
     </div>
 
     <div class="field">
@@ -51,13 +49,13 @@
     </div>
 
     <div class="field">
-      <label>勤務時間</label>
+      <label>勤務時間（15分刻み）</label>
       <div style="display:flex; gap:10px; align-items:center;">
-        <input type="time" id="startTime" value="10:00">
+        <input type="time" id="startTime" value="10:00" step="900">
         <span>〜</span>
-        <input type="time" id="endTime" value="19:30">
+        <input type="time" id="endTime" value="19:30" step="900">
       </div>
-      <div class="hint">※時間を空欄にして送ると、選択した日のシフトを削除します。</div>
+      <div class="hint">※前月・今月・来月のみ選択可能です。</div>
     </div>
 
     <button type="button" class="main-btn" id="submitBtn" onclick="handleSubmit()">送信する</button>
@@ -65,14 +63,11 @@
   </form>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
 <script>
-  // ★設定項目
-  const MY_LIFF_ID = "あなたのLIFF_ID"; 
-  const GAS_URL = "あなたのGAS_ウェブアプリURL";
+  const MY_LIFF_ID = "2008904530-lXx8C9i5"; 
+  const GAS_URL = "あなたのGASウェブアプリURL";
   
-  let fp; // カレンダーインスタンス
+  let fp; 
   let submittedDates = [];
 
   function setType(val) {
@@ -81,33 +76,26 @@
     document.getElementById('btn-remote').classList.toggle('active', val === 'リモート');
   }
 
-  window.onload = async function() {
-    // 1. まず何よりも先にカレンダーを初期化する（これで「タップできない」を防ぐ）
+  // カレンダー移動範囲の計算（前月1日〜来月末日）
+  const now = new Date();
+  const minDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const maxDate = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+
+  // ライブラリの読み込み完了を待ってから初期化
+  document.addEventListener("DOMContentLoaded", function() {
     initCalendar();
-
-    try {
-      await liff.init({ liffId: MY_LIFF_ID });
-      if (!liff.isLoggedIn()) {
-        liff.login();
-        return;
-      }
-      const userId = liff.getContext().userId;
-      document.getElementById('userId').value = userId;
-
-      // 2. カレンダーが出た後に、裏でデータを読み込む
-      loadCurrentShifts(userId);
-    } catch (err) {
-      console.error("LIFF init failed", err);
-    }
-  };
+    initLiff();
+  });
 
   function initCalendar() {
     fp = flatpickr("#targetDate", {
       locale: "ja",
       mode: "multiple",
       dateFormat: "Y/m/d",
-      minDate: "today",
+      minDate: minDate,
+      maxDate: maxDate,
       conjunction: ", ",
+      disableMobile: "true", // モバイルでも独自カレンダーを強制表示
       onDayCreate: function(dObj, dStr, fp, dayElem) {
         const date = dayElem.dateObj;
         const formatted = date.getFullYear() + '/' + 
@@ -120,19 +108,29 @@
     });
   }
 
+  async function initLiff() {
+    try {
+      await liff.init({ liffId: MY_LIFF_ID });
+      if (!liff.isLoggedIn()) {
+        liff.login();
+      } else {
+        const userId = liff.getContext().userId;
+        document.getElementById('userId').value = userId;
+        loadCurrentShifts(userId);
+      }
+    } catch (err) { console.error(err); }
+  }
+
   async function loadCurrentShifts(userId) {
     try {
       const response = await fetch(`${GAS_URL}?userId=${userId}`);
-      if (!response.ok) throw new Error('Network response was not ok');
       const data = await response.json();
       submittedDates = data.dates || [];
       if (submittedDates.length > 0) {
         document.getElementById('status-bar').style.display = 'block';
-        fp.redraw(); // データが届いたらカレンダーを再描画して色を塗る
+        if(fp) fp.redraw();
       }
-    } catch (err) {
-      console.error("Shift data load failed", err);
-    }
+    } catch (err) { console.error(err); }
   }
 
   async function handleSubmit() {
