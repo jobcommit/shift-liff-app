@@ -9,178 +9,134 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
   <style>
-    body { font-family: sans-serif; margin: 0; padding: 20px 15px; background-color: #f0f4f8; color: #333; }
-    .container { max-width: 450px; margin: auto; background: #ffffff; padding: 25px 20px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-    h2 { text-align: center; color: #0056d2; margin-bottom: 20px; font-size: 1.4rem; }
-    .status-bar { background: #fff9c4; padding: 10px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 15px; text-align: center; color: #856404; display: none; }
-    .field { margin-bottom: 18px; }
-    label { display: block; font-weight: bold; margin-bottom: 8px; font-size: 0.9rem; }
-    select, input { width: 100%; padding: 12px; border: 1px solid #c2d1e5; border-radius: 8px; box-sizing: border-box; font-size: 16px; background: #fff; }
+    body { font-family: sans-serif; margin: 0; padding: 20px 15px; background-color: #f0f4f8; }
+    .container { max-width: 450px; margin: auto; background: #ffffff; padding: 20px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    h2 { text-align: center; color: #0056d2; margin-top: 0; }
+    .status-bar { background: #fff9c4; padding: 10px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 15px; text-align: center; display: none; }
+    .field { margin-bottom: 15px; }
+    label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.9rem; }
+    select, input { width: 100%; padding: 12px; border: 1px solid #c2d1e5; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
     .type-selector { display: flex; gap: 10px; }
     .type-btn { flex: 1; padding: 12px; border: 1px solid #c2d1e5; background: #fff; border-radius: 8px; cursor: pointer; text-align: center; }
-    .type-btn.active { background: #0056d2; color: #fff; border-color: #0056d2; font-weight: bold; }
-    .time-flex { display: flex; gap: 10px; align-items: center; }
-    button.main-btn { width: 100%; padding: 16px; background: #0056d2; color: white; border: none; border-radius: 30px; font-size: 17px; font-weight: bold; margin-top: 10px; cursor: pointer; }
-    .shift-list-container { margin-top: 30px; border-top: 2px solid #0056d2; padding-top: 20px; }
-    .shift-list-title { font-weight: bold; font-size: 1rem; margin-bottom: 15px; color: #0056d2; text-align: center; }
-    .shift-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-    .shift-table th { background: #eef2f7; padding: 8px; border: 1px solid #c2d1e5; }
-    .shift-table td { padding: 8px 5px; border: 1px solid #eee; text-align: center; }
-    .val-text { font-weight: bold; color: #d32f2f; }
+    .type-btn.active { background: #0056d2; color: #fff; font-weight: bold; }
+    button.main-btn { width: 100%; padding: 16px; background: #0056d2; color: white; border: none; border-radius: 30px; font-size: 17px; font-weight: bold; cursor: pointer; }
+    .shift-table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 0.85rem; table-layout: fixed; }
+    .shift-table th, .shift-table td { border: 1px solid #eee; padding: 8px; text-align: center; overflow: hidden; }
     .has-shift { background: #ffeb3b !important; border-radius: 50% !important; font-weight: bold !important; }
-    #loading-overlay { display: none; text-align: center; padding: 10px; color: #0056d2; font-weight: bold; }
   </style>
 </head>
 <body>
-
 <div class="container">
-  <h2 id="display-month">シフト管理</h2>
-  <div id="status-bar" class="status-bar">黄色い日は提出済みです</div>
-  
-  <form id="shift-form">
-    <input type="hidden" id="userId">
-    <input type="hidden" id="workType" value="出社">
-    <div class="field">
-      <label>勤務日選択（複数可）</label>
-      <input type="text" id="targetDate" placeholder="タップして選択" readonly>
-    </div>
-    <div class="field">
-      <label>区分</label>
-      <div class="type-selector">
-        <div id="btn-office" class="type-btn active" onclick="setType('出社')">出社</div>
-        <div id="btn-remote" class="type-btn" onclick="setType('リモート')">リモート</div>
-      </div>
-    </div>
-    <div class="field">
-      <label>時間（15分刻み）</label>
-      <div class="time-flex">
-        <select id="startTime"></select><span>〜</span><select id="endTime"></select>
-      </div>
-    </div>
-    <button type="button" class="main-btn" id="submitBtn" onclick="handleSubmit()">一括送信する</button>
-    <div id="loading-overlay">送信中...</div>
-  </form>
+  <h2 id="title">シフト管理</h2>
+  <div id="status-bar" class="status-bar"></div>
 
-  <div class="shift-list-container">
-    <div class="shift-list-title" id="list-title">📋 申請状況（3ヶ月分）</div>
-    <table class="shift-table">
-      <thead><tr><th>日付</th><th>内容</th></tr></thead>
-      <tbody id="shift-list-body"></tbody>
-    </table>
-    <div id="no-data" style="text-align:center; padding:20px; display:none; color:#999;">データ読み込み中...</div>
+  <div class="field">
+    <label>勤務日選択（複数可）</label>
+    <input type="text" id="targetDate" placeholder="タップして選択" readonly>
   </div>
+
+  <div class="field">
+    <label>区分</label>
+    <div class="type-selector">
+      <div id="btn-office" class="type-btn active" onclick="setType('出社')">出社</div>
+      <div id="btn-remote" class="type-btn" onclick="setType('リモート')">リモート</div>
+    </div>
+    <input type="hidden" id="workType" value="出社">
+  </div>
+
+  <div class="field">
+    <label>時間</label>
+    <div style="display:flex; gap:10px; align-items:center;">
+      <select id="startTime"></select><span>〜</span><select id="endTime"></select>
+    </div>
+  </div>
+
+  <button class="main-btn" onclick="handleSubmit()">一括送信する</button>
+
+  <div style="margin-top:30px; font-weight:bold; color:#0056d2; border-bottom: 2px solid #0056d2; padding-bottom:5px;">📋 申請状況（3ヶ月分）</div>
+  <table class="shift-table">
+    <thead><tr><th style="width:45%">日付</th><th style="width:55%">内容</th></tr></thead>
+    <tbody id="shift-list-body"></tbody>
+  </table>
 </div>
 
 <script>
-  // ★重要：自分のものに書き換えてください
-  const MY_LIFF_ID = "2008904530-lXx8C9i5"; 
-  const GAS_URL = "あなたのGAS_ウェブアプリURL";
-  
-  let fp; 
+  const MY_LIFF_ID = "2008904530-lXx8C9i5";
+  const GAS_URL = "あなたの最新GASウェブアプリURL";
   let submittedDates = [];
+  let fp;
 
-  function setType(val) {
-    document.getElementById('workType').value = val;
-    document.getElementById('btn-office').classList.toggle('active', val === '出社');
-    document.getElementById('btn-remote').classList.toggle('active', val === 'リモート');
+  function setType(v) {
+    document.getElementById('workType').value = v;
+    document.getElementById('btn-office').classList.toggle('active', v === '出社');
+    document.getElementById('btn-remote').classList.toggle('active', v === 'リモート');
   }
 
-  function createTimeOptions() {
-    const s = document.getElementById('startTime');
-    const e = document.getElementById('endTime');
+  function createOptions() {
+    const s = document.getElementById('startTime'), e = document.getElementById('endTime');
     for (let h = 0; h < 24; h++) {
       for (let m = 0; m < 60; m += 15) {
-        const time = ('0' + h).slice(-2) + ":" + ('0' + m).slice(-2);
-        s.add(new Option(time, time)); e.add(new Option(time, time));
+        const t = ('0' + h).slice(-2) + ":" + ('0' + m).slice(-2);
+        s.add(new Option(t, t)); e.add(new Option(t, t));
       }
     }
     s.value = "10:00"; e.value = "19:30";
   }
 
-  document.addEventListener("DOMContentLoaded", function() {
-    createTimeOptions();
+  window.onload = function() {
+    createOptions();
     const now = new Date();
-    document.getElementById('display-month').innerText = `シフト管理（${now.getFullYear()}/${now.getMonth() + 1}）`;
-
-    const minDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const maxDate = new Date(now.getFullYear(), now.getMonth() + 2, 0);
-
+    
     fp = flatpickr("#targetDate", {
       locale: "ja", mode: "multiple", dateFormat: "Y/m/d",
-      minDate: minDate, maxDate: maxDate,
-      conjunction: ", ", disableMobile: true,
+      minDate: new Date(now.getFullYear(), now.getMonth() - 1, 1),
+      maxDate: new Date(now.getFullYear(), now.getMonth() + 2, 0),
+      disableMobile: true,
       onDayCreate: function(dObj, dStr, fp, dayElem) {
         const d = dayElem.dateObj;
         const f = d.getFullYear() + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + ('0' + d.getDate()).slice(-2);
-        if (submittedDates.includes(f)) { dayElem.classList.add("has-shift"); }
+        if (submittedDates.includes(f)) dayElem.classList.add("has-shift");
       }
     });
-    initLiff();
-  });
 
-  async function initLiff() {
-    try {
-      await liff.init({ liffId: MY_LIFF_ID });
+    liff.init({ liffId: MY_LIFF_ID }).then(() => {
       if (!liff.isLoggedIn()) { liff.login(); }
       else {
-        const uid = liff.getContext().userId;
-        document.getElementById('userId').value = uid;
-        loadCurrentShifts(uid);
+        fetchData(liff.getContext().userId);
       }
-    } catch (err) { console.error(err); }
-  }
-
-  async function loadCurrentShifts(uid) {
-    try {
-      const res = await fetch(`${GAS_URL}?userId=${uid}`);
-      const data = await res.json();
-      submittedDates = data.dates || [];
-      if (submittedDates.length > 0) {
-        document.getElementById('status-bar').style.display = 'block';
-        if(fp) fp.redraw();
-      }
-      renderTable(data.details || []);
-    } catch (err) { 
-        console.error(err);
-        document.getElementById('no-data').innerText = "データの取得に失敗しました。";
-        document.getElementById('no-data').style.display = "block";
-    }
-  }
-
-  function renderTable(details) {
-    const body = document.getElementById('shift-list-body');
-    body.innerHTML = "";
-    if (details.length === 0) { 
-        document.getElementById('no-data').innerText = "登録されたデータがありません。";
-        document.getElementById('no-data').style.display = "block"; 
-        return; 
-    }
-    document.getElementById('no-data').style.display = "none";
-    details.forEach(item => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${item.date}</td><td class="val-text">${item.val}</td>`;
-      body.appendChild(tr);
     });
+  };
+
+  function fetchData(uid) {
+    fetch(`${GAS_URL}?userId=${uid}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) {
+          document.getElementById('status-bar').innerText = data.error;
+          document.getElementById('status-bar').style.display = "block";
+          return;
+        }
+        submittedDates = data.dates || [];
+        fp.redraw();
+        const body = document.getElementById('shift-list-body');
+        body.innerHTML = "";
+        data.details.forEach(item => {
+          const tr = document.createElement('tr');
+          const valStyle = item.val !== "-" ? "font-weight:bold; color:#d32f2f;" : "color:#ccc;";
+          tr.innerHTML = `<td>${item.date}</td><td style="${valStyle}">${item.val}</td>`;
+          body.appendChild(tr);
+        });
+      });
   }
 
   async function handleSubmit() {
     const d = document.getElementById('targetDate').value;
-    const s = document.getElementById('startTime').value;
-    const e = document.getElementById('endTime').value;
-    const t = document.getElementById('workType').value;
-    if (!d) { alert("日付を選択してください"); return; }
-    document.getElementById('submitBtn').disabled = true;
-    document.getElementById('loading-overlay').style.display = "block";
-    const isDelete = (s === "" || e === "");
-    const message = `【シフト一括】\n日付:${d}\n時間:${isDelete ? "削除" : t+"("+s+"-"+e+")"}`;
-    try {
-      await liff.sendMessages([{ type: 'text', text: message }]);
-      liff.closeWindow();
-    } catch (error) {
-      alert("送信失敗");
-      document.getElementById('submitBtn').disabled = false;
-      document.getElementById('loading-overlay').style.display = "none";
-    }
+    const s = document.getElementById('startTime').value, e = document.getElementById('endTime').value;
+    const type = document.getElementById('workType').value;
+    if (!d) return alert("日付を選択してください");
+    const msg = `【シフト一括】\n日付:${d}\n時間:${type}(${s}-${e})`;
+    await liff.sendMessages([{ type: 'text', text: msg }]);
+    liff.closeWindow();
   }
 </script>
 </body>
