@@ -12,24 +12,26 @@
     body { font-family: sans-serif; margin: 0; padding: 20px 15px; background-color: #e6f2ff; color: #333; }
     .container { max-width: 450px; margin: auto; background: #ffffff; padding: 25px 20px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
     h2 { text-align: center; color: #0056d2; margin-bottom: 20px; font-size: 1.4rem; }
-    .status-bar { background: #fff9c4; padding: 10px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 10px; text-align: center; color: #856404; display: none; }
-    
-    /* 申請済みリストのスタイル */
-    .shift-list-container { margin-top: 20px; border-top: 2px dashed #eee; padding-top: 15px; }
-    .shift-list-title { font-weight: bold; font-size: 0.9rem; margin-bottom: 10px; color: #0056d2; }
-    .shift-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f9f9f9; font-size: 0.85rem; }
-    .shift-date { font-weight: 600; }
-    .shift-val { color: #555; }
-
+    .status-bar { background: #fff9c4; padding: 10px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 15px; text-align: center; color: #856404; display: none; }
     .field { margin-bottom: 18px; }
-    label { display: block; font-weight: 600; margin-bottom: 8px; color: #444; font-size: 0.9rem; }
+    label { display: block; font-weight: bold; margin-bottom: 8px; color: #444; font-size: 0.9rem; }
     input, select { width: 100%; padding: 12px; border: 1px solid #c2d1e5; border-radius: 8px; box-sizing: border-box; font-size: 16px; background: #fff; }
     .type-selector { display: flex; gap: 10px; }
     .type-btn { flex: 1; padding: 12px; border: 1px solid #c2d1e5; background: #fff; border-radius: 8px; cursor: pointer; text-align: center; font-size: 14px; }
     .type-btn.active { background: #0056d2; color: #fff; border-color: #0056d2; font-weight: bold; }
     .time-flex { display: flex; gap: 10px; align-items: center; }
-    .hint { font-size: 0.75rem; color: #666; margin-top: 5px; line-height: 1.4; }
     button.main-btn { width: 100%; padding: 16px; background: #0056d2; color: white; border: none; border-radius: 30px; font-size: 17px; font-weight: bold; margin-top: 20px; cursor: pointer; }
+
+    /* --- 下部の3ヶ月シフトリスト --- */
+    .shift-list-container { margin-top: 30px; border-top: 2px solid #0056d2; padding-top: 20px; }
+    .shift-list-title { font-weight: bold; font-size: 1rem; margin-bottom: 15px; color: #0056d2; text-align: center; }
+    .shift-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .shift-table th { background: #f0f7ff; padding: 8px; border: 1px solid #c2d1e5; color: #0056d2; }
+    .shift-table td { padding: 10px 8px; border: 1px solid #eee; text-align: center; }
+    .date-col { font-weight: bold; width: 40%; }
+    .val-col { width: 60%; color: #d32f2f; font-weight: bold; }
+    .no-data { text-align: center; padding: 20px; color: #999; font-size: 0.8rem; }
+    
     .has-shift { background: #ffeb3b !important; border-radius: 50% !important; font-weight: bold !important; color: #000 !important; }
     #loading-overlay { display: none; text-align: center; padding: 10px; color: #0056d2; font-weight: bold; }
   </style>
@@ -43,12 +45,10 @@
   <form id="shift-form">
     <input type="hidden" id="userId">
     <input type="hidden" id="workType" value="出社">
-
     <div class="field">
       <label>勤務日（複数選択可）</label>
       <input type="text" id="targetDate" placeholder="タップして日付を選択" readonly>
     </div>
-
     <div class="field">
       <label>勤務区分</label>
       <div class="type-selector">
@@ -56,23 +56,26 @@
         <div id="btn-remote" class="type-btn" onclick="setType('リモート')">リモート</div>
       </div>
     </div>
-
     <div class="field">
       <label>勤務時間</label>
       <div class="time-flex">
-        <select id="startTime"></select>
-        <span>〜</span>
-        <select id="endTime"></select>
+        <select id="startTime"></select><span>〜</span><select id="endTime"></select>
       </div>
     </div>
-
     <button type="button" class="main-btn" id="submitBtn" onclick="handleSubmit()">一括送信する</button>
     <div id="loading-overlay">送信中...</div>
   </form>
 
-  <div id="shift-list-area" class="shift-list-container" style="display:none;">
-    <div class="shift-list-title">【現在の申請状況】</div>
-    <div id="shift-items"></div>
+  <div class="shift-list-container">
+    <div class="shift-list-title">📋 3ヶ月間の申請状況</div>
+    <table class="shift-table" id="shift-table">
+      <thead>
+        <tr><th>日付</th><th>シフト内容</th></tr>
+      </thead>
+      <tbody id="shift-list-body">
+        </tbody>
+    </table>
+    <div id="no-shift-msg" class="no-data" style="display:none;">現在、申請されているシフトはありません。</div>
   </div>
 </div>
 
@@ -81,8 +84,7 @@
   const GAS_URL = "あなたのGASウェブアプリURL";
   
   let fp; 
-  let submittedDates = []; // 日付のみ（カレンダー用）
-  let shiftDetails = [];   // 日付と内容のセット（リスト表示用）
+  let submittedDates = [];
 
   function setType(val) {
     document.getElementById('workType').value = val;
@@ -91,19 +93,15 @@
   }
 
   function createTimeOptions() {
-    const startSelect = document.getElementById('startTime');
-    const endSelect = document.getElementById('endTime');
+    const s = document.getElementById('startTime');
+    const e = document.getElementById('endTime');
     for (let h = 0; h < 24; h++) {
       for (let m = 0; m < 60; m += 15) {
-        const hh = ('0' + h).slice(-2);
-        const mm = ('0' + m).slice(-2);
-        const timeStr = `${hh}:${mm}`;
-        startSelect.add(new Option(timeStr, timeStr));
-        endSelect.add(new Option(timeStr, timeStr));
+        const time = ('0' + h).slice(-2) + ":" + ('0' + m).slice(-2);
+        s.add(new Option(time, time)); e.add(new Option(time, time));
       }
     }
-    startSelect.value = "10:00";
-    endSelect.value = "19:30";
+    s.value = "10:00"; e.value = "19:30";
   }
 
   document.addEventListener("DOMContentLoaded", function() {
@@ -115,9 +113,9 @@
       maxDate: new Date(now.getFullYear(), now.getMonth() + 2, 0),
       conjunction: ", ", disableMobile: true,
       onDayCreate: function(dObj, dStr, fp, dayElem) {
-        const date = dayElem.dateObj;
-        const formatted = date.getFullYear() + '/' + ('0' + (date.getMonth() + 1)).slice(-2) + '/' + ('0' + date.getDate()).slice(-2);
-        if (submittedDates.includes(formatted)) { dayElem.classList.add("has-shift"); }
+        const d = dayElem.dateObj;
+        const f = d.getFullYear() + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + ('0' + d.getDate()).slice(-2);
+        if (submittedDates.includes(f)) { dayElem.classList.add("has-shift"); }
       }
     });
     initLiff();
@@ -128,71 +126,60 @@
       await liff.init({ liffId: MY_LIFF_ID });
       if (!liff.isLoggedIn()) { liff.login(); }
       else {
-        const userId = liff.getContext().userId;
-        document.getElementById('userId').value = userId;
-        loadCurrentShifts(userId);
+        const uid = liff.getContext().userId;
+        document.getElementById('userId').value = uid;
+        loadCurrentShifts(uid);
       }
     } catch (err) { console.error(err); }
   }
 
-  async function loadCurrentShifts(userId) {
+  async function loadCurrentShifts(uid) {
     try {
-      const response = await fetch(`${GAS_URL}?userId=${userId}`);
-      const data = await response.json();
-      
-      // データ保存
+      const res = await fetch(`${GAS_URL}?userId=${uid}`);
+      const data = await res.json();
       submittedDates = data.dates || [];
-      shiftDetails = data.details || []; // [{date: '2024/04/03', val: '13-17'}, ...]
+      const details = data.details || [];
 
       if (submittedDates.length > 0) {
         document.getElementById('status-bar').style.display = 'block';
         if(fp) fp.redraw();
-        renderShiftList();
       }
+      renderTable(details);
     } catch (err) { console.error(err); }
   }
 
-  // リストを生成する関数
-  function renderShiftList() {
-    const area = document.getElementById('shift-list-area');
-    const container = document.getElementById('shift-items');
-    container.innerHTML = "";
+  function renderTable(details) {
+    const body = document.getElementById('shift-list-body');
+    const msg = document.getElementById('no-shift-msg');
+    body.innerHTML = "";
     
-    if (shiftDetails.length === 0) {
-      area.style.display = "none";
+    if (details.length === 0) {
+      msg.style.display = "block";
       return;
     }
 
-    area.style.display = "block";
-    shiftDetails.forEach(item => {
-      const div = document.createElement('div');
-      div.className = 'shift-item';
-      div.innerHTML = `<span class="shift-date">${item.date}</span><span class="shift-val">${item.val}</span>`;
-      container.appendChild(div);
+    msg.style.display = "none";
+    details.forEach(item => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td class="date-col">${item.date}</td><td class="val-col">${item.val}</td>`;
+      body.appendChild(tr);
     });
   }
 
   async function handleSubmit() {
-    const dates = document.getElementById('targetDate').value;
-    const start = document.getElementById('startTime').value;
-    const end = document.getElementById('endTime').value;
-    const type = document.getElementById('workType').value;
-    
-    if (!dates) { alert("日付を選択してください"); return; }
+    const d = document.getElementById('targetDate').value;
+    const s = document.getElementById('startTime').value;
+    const e = document.getElementById('endTime').value;
+    const t = document.getElementById('workType').value;
+    if (!d) { alert("日付を選択してください"); return; }
     document.getElementById('submitBtn').disabled = true;
     document.getElementById('loading-overlay').style.display = "block";
-
-    const isDelete = (start === "" || end === "");
-    const timeRange = isDelete ? "削除" : `${type}(${start}-${end})`;
-    const message = `【シフト一括】\n日付:${dates}\n時間:${timeRange}`;
-
+    const isDel = (s === "" || e === "");
+    const msg = `【シフト一括】\n日付:${d}\n時間:${isDel ? "削除" : t+"("+s+"-"+e+")"}`;
     try {
-      await liff.sendMessages([{ type: 'text', text: message }]);
+      await liff.sendMessages([{ type: 'text', text: msg }]);
       liff.closeWindow();
-    } catch (error) {
-      alert("送信エラー");
-      document.getElementById('submitBtn').disabled = false;
-    }
+    } catch (err) { alert("エラー"); document.getElementById('submitBtn').disabled = false; }
   }
 </script>
 </body>
