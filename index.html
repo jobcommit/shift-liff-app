@@ -13,18 +13,16 @@
     .status-bar { background: #fff9c4; padding: 10px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 15px; text-align: center; color: #856404; display: none; }
     .field { margin-bottom: 18px; }
     label { display: block; font-weight: 600; margin-bottom: 8px; color: #444; font-size: 0.9rem; }
-    input, select { width: 100%; padding: 12px; border: 1px solid #c2d1e5; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+    input { width: 100%; padding: 12px; border: 1px solid #c2d1e5; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
     
-    /* 勤務区分ボタン */
     .type-selector { display: flex; gap: 10px; }
-    .type-btn { flex: 1; padding: 12px; border: 1px solid #c2d1e5; background: #fff; border-radius: 8px; cursor: pointer; text-align: center; font-size: 14px; transition: 0.2s; }
+    .type-btn { flex: 1; padding: 12px; border: 1px solid #c2d1e5; background: #fff; border-radius: 8px; cursor: pointer; text-align: center; font-size: 14px; }
     .type-btn.active { background: #0056d2; color: #fff; border-color: #0056d2; font-weight: bold; }
     
     .hint { font-size: 0.75rem; color: #666; margin-top: 5px; line-height: 1.4; }
     button.main-btn { width: 100%; padding: 16px; background: #0056d2; color: white; border: none; border-radius: 30px; font-size: 17px; font-weight: bold; margin-top: 20px; cursor: pointer; }
-    button:disabled { background: #ccc; }
-
-    /* カレンダーの入力済みマーク */
+    
+    /* カレンダーの色付け用CSS */
     .has-shift { background: #ffeb3b !important; border-radius: 50% !important; font-weight: bold !important; color: #000 !important; }
     #loading-overlay { display: none; text-align: center; padding: 10px; color: #0056d2; font-weight: bold; }
   </style>
@@ -59,22 +57,24 @@
         <span>〜</span>
         <input type="time" id="endTime" value="19:30">
       </div>
-      <div class="hint">※時間を空欄にして送ると、選択した日のシフトを<b>削除</b>します。</div>
+      <div class="hint">※時間を空欄にして送ると、選択した日のシフトを削除します。</div>
     </div>
 
-    <button type="button" class="main-btn" id="submitBtn" onclick="handleSubmit()">一括送信する</button>
-    <div id="loading-overlay">処理中...</div>
+    <button type="button" class="main-btn" id="submitBtn" onclick="handleSubmit()">送信する</button>
+    <div id="loading-overlay">送信中...</div>
   </form>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
 <script>
-  const MY_LIFF_ID = "2008904530-lXx8C9i5"; 
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbwaBCK6fR_OOMFxMdEs9Axh_TLpLk_3tp7jLZKzTYmPJSv5nmA8t8ewwoXSIZ579GA/exec";
+  // ★設定項目
+  const MY_LIFF_ID = "あなたのLIFF_ID"; 
+  const GAS_URL = "あなたのGAS_ウェブアプリURL";
+  
+  let fp; // カレンダーインスタンス
   let submittedDates = [];
 
-  // 勤務区分の切り替え
   function setType(val) {
     document.getElementById('workType').value = val;
     document.getElementById('btn-office').classList.toggle('active', val === '出社');
@@ -82,44 +82,33 @@
   }
 
   window.onload = async function() {
+    // 1. まず何よりも先にカレンダーを初期化する（これで「タップできない」を防ぐ）
+    initCalendar();
+
     try {
       await liff.init({ liffId: MY_LIFF_ID });
       if (!liff.isLoggedIn()) {
         liff.login();
-      } else {
-        const userId = liff.getContext().userId;
-        document.getElementById('userId').value = userId;
-        // 現在の提出状況を取得
-        loadCurrentShifts(userId);
+        return;
       }
-    } catch (err) { console.error(err); }
+      const userId = liff.getContext().userId;
+      document.getElementById('userId').value = userId;
+
+      // 2. カレンダーが出た後に、裏でデータを読み込む
+      loadCurrentShifts(userId);
+    } catch (err) {
+      console.error("LIFF init failed", err);
+    }
   };
 
-  // GASから提出済みのシフト日を取得
-  async function loadCurrentShifts(userId) {
-    try {
-      const response = await fetch(`${GAS_URL}?userId=${userId}`);
-      const data = await response.json();
-      submittedDates = data.dates || [];
-      if (submittedDates.length > 0) {
-        document.getElementById('status-bar').style.display = 'block';
-      }
-      initCalendar();
-    } catch (err) {
-      console.error("データ取得失敗", err);
-      initCalendar();
-    }
-  }
-
   function initCalendar() {
-    flatpickr("#targetDate", {
+    fp = flatpickr("#targetDate", {
       locale: "ja",
       mode: "multiple",
       dateFormat: "Y/m/d",
       minDate: "today",
       conjunction: ", ",
       onDayCreate: function(dObj, dStr, fp, dayElem) {
-        // yyyy/mm/dd 形式に変換して比較
         const date = dayElem.dateObj;
         const formatted = date.getFullYear() + '/' + 
                           ('0' + (date.getMonth() + 1)).slice(-2) + '/' + 
@@ -129,6 +118,21 @@
         }
       }
     });
+  }
+
+  async function loadCurrentShifts(userId) {
+    try {
+      const response = await fetch(`${GAS_URL}?userId=${userId}`);
+      if (!response.ok) throw new Error('Network response was not ok');
+      const data = await response.json();
+      submittedDates = data.dates || [];
+      if (submittedDates.length > 0) {
+        document.getElementById('status-bar').style.display = 'block';
+        fp.redraw(); // データが届いたらカレンダーを再描画して色を塗る
+      }
+    } catch (err) {
+      console.error("Shift data load failed", err);
+    }
   }
 
   async function handleSubmit() {
@@ -142,7 +146,6 @@
     document.getElementById('submitBtn').disabled = true;
     document.getElementById('loading-overlay').style.display = "block";
 
-    // 削除か登録かの判定
     const isDelete = (start === "" || end === "");
     const timeRange = isDelete ? "削除" : `${type}(${start}-${end})`;
     const message = `【シフト一括】\n日付:${dates}\n時間:${timeRange}`;
