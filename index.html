@@ -1,28 +1,86 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>シフト申請フォーム</title>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 20px 15px; background-color: #e6f2ff; color: #333; }
+    .container { max-width: 450px; margin: auto; background: #ffffff; padding: 30px 20px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0, 86, 210, 0.1); }
+    h2 { text-align: center; color: #0056d2; margin-bottom: 25px; font-size: 1.4rem; }
+    .field { margin-bottom: 20px; }
+    label { display: block; font-weight: 600; margin-bottom: 8px; color: #444; }
+    input { width: 100%; padding: 14px; border: 1px solid #c2d1e5; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+    .time-group { display: flex; gap: 10px; align-items: center; }
+    .hint { font-size: 0.8rem; color: #666; margin-top: 5px; line-height: 1.4; }
+    button { width: 100%; padding: 16px; background: #0056d2; color: white; border: none; border-radius: 30px; font-size: 17px; font-weight: bold; cursor: pointer; margin-top: 15px; }
+    #loading { display: none; text-align: center; margin-top: 20px; color: #0056d2; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2>シフト一括申請・削除</h2>
+  <form id="shift-form">
+    <input type="hidden" id="userId">
+
+    <div class="field">
+      <label>勤務日（複数選択可）</label>
+      <input type="text" id="targetDate" placeholder="タップして日付を選択" readonly>
+      <div class="hint">※複数日選ぶと同じ時間が一括入力されます。</div>
+    </div>
+
+    <div class="field">
+      <label>勤務時間</label>
+      <div class="time-group">
+        <input type="time" id="startTime">
+        <span>〜</span>
+        <input type="time" id="endTime">
+      </div>
+      <div class="hint">※時間を空欄にして送信すると、選択した日のシフトが<b>削除</b>されます。</div>
+    </div>
+
+    <button type="button" id="submitBtn" onclick="handleSubmit()">一括送信する</button>
+    <div id="loading">送信中...</div>
+  </form>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
 <script>
+  // ★あなたのLIFF IDに書き換えてください
+  const MY_LIFF_ID = "2008904530-lXx8C9i5"; 
+
   window.onload = function() {
-    // 複数選択モードに変更 (mode: "multiple")
+    // 複数選択モード(multiple)でカレンダーを初期化
     flatpickr("#targetDate", { 
       locale: "ja", 
       dateFormat: "Y/m/d", 
       minDate: "today",
-      mode: "multiple", // これでカレンダーでポチポチ複数選べます
+      mode: "multiple",
       conjunction: ", "
     });
 
-    liff.init({ liffId: "あなたのLIFF_ID" }).then(() => {
-      if (!liff.isLoggedIn()) liff.login();
-      else document.getElementById('userId').value = liff.getContext().userId;
-    });
+    liff.init({ liffId: MY_LIFF_ID })
+      .then(() => {
+        if (!liff.isLoggedIn()) { liff.login(); }
+        else { document.getElementById('userId').value = liff.getContext().userId; }
+      });
   };
 
   async function handleSubmit() {
-    const dates = document.getElementById('targetDate').value; // "2026/04/21, 2026/04/22" とカンマ区切りで取得
+    const dates = document.getElementById('targetDate').value;
     const start = document.getElementById('startTime').value;
     const end = document.getElementById('endTime').value;
     
     if (!dates) { alert("日付を選択してください"); return; }
 
-    // 削除機能のUI代わり：時間が空なら「削除」として扱う
+    document.getElementById('submitBtn').disabled = true;
+    document.getElementById('loading').style.display = "block";
+
+    // 時間がどちらか空なら「削除」という文字列にする
     const timeRange = (start === "" || end === "") ? "削除" : `${start}-${end}`;
     const message = `【シフト一括】\n日付:${dates}\n時間:${timeRange}`;
 
@@ -31,6 +89,10 @@
       liff.closeWindow();
     } catch (error) {
       alert("エラー: " + error);
+      document.getElementById('submitBtn').disabled = false;
+      document.getElementById('loading').style.display = "none";
     }
   }
 </script>
+</body>
+</html>
