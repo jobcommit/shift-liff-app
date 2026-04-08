@@ -15,10 +15,11 @@
     .status-bar { background: #fff9c4; padding: 10px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 15px; text-align: center; color: #856404; display: none; }
     .field { margin-bottom: 18px; }
     label { display: block; font-weight: 600; margin-bottom: 8px; color: #444; font-size: 0.9rem; }
-    input { width: 100%; padding: 12px; border: 1px solid #c2d1e5; border-radius: 8px; box-sizing: border-box; font-size: 16px; background: #fff; }
+    input, select { width: 100%; padding: 12px; border: 1px solid #c2d1e5; border-radius: 8px; box-sizing: border-box; font-size: 16px; background: #fff; }
     .type-selector { display: flex; gap: 10px; }
     .type-btn { flex: 1; padding: 12px; border: 1px solid #c2d1e5; background: #fff; border-radius: 8px; cursor: pointer; text-align: center; font-size: 14px; }
     .type-btn.active { background: #0056d2; color: #fff; border-color: #0056d2; font-weight: bold; }
+    .time-flex { display: flex; gap: 10px; align-items: center; }
     .hint { font-size: 0.75rem; color: #666; margin-top: 5px; line-height: 1.4; }
     button.main-btn { width: 100%; padding: 16px; background: #0056d2; color: white; border: none; border-radius: 30px; font-size: 17px; font-weight: bold; margin-top: 20px; cursor: pointer; }
     .has-shift { background: #ffeb3b !important; border-radius: 50% !important; font-weight: bold !important; color: #000 !important; }
@@ -49,13 +50,13 @@
     </div>
 
     <div class="field">
-      <label>勤務時間（15分刻み）</label>
-      <div style="display:flex; gap:10px; align-items:center;">
-        <input type="time" id="startTime" value="10:00" step="900">
+      <label>勤務時間</label>
+      <div class="time-flex">
+        <select id="startTime"><option value="">開始</option></select>
         <span>〜</span>
-        <input type="time" id="endTime" value="19:30" step="900">
+        <select id="endTime"><option value="">終了</option></select>
       </div>
-      <div class="hint">※前月・今月・来月のみ選択可能です。時間を空にすると削除。</div>
+      <div class="hint">※前月〜来月まで選択可。両方「空」で送信すると削除。</div>
     </div>
 
     <button type="button" class="main-btn" id="submitBtn" onclick="handleSubmit()">一括送信する</button>
@@ -77,16 +78,32 @@
     document.getElementById('btn-remote').classList.toggle('active', val === 'リモート');
   }
 
-  const now = new Date();
-  const minD = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const maxD = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+  // 15分刻みのプルダウン生成
+  function createTimeOptions() {
+    const startSelect = document.getElementById('startTime');
+    const endSelect = document.getElementById('endTime');
+    for (let h = 0; h < 24; h++) {
+      for (let m = 0; m < 60; m += 15) {
+        const hh = ('0' + h).slice(-2);
+        const mm = ('0' + m).slice(-2);
+        const timeStr = `${hh}:${mm}`;
+        startSelect.add(new Option(timeStr, timeStr));
+        endSelect.add(new Option(timeStr, timeStr));
+      }
+    }
+    // 初期値セット
+    startSelect.value = "10:00";
+    endSelect.value = "19:30";
+  }
 
-  // カレンダーとLIFFの初期化
   document.addEventListener("DOMContentLoaded", function() {
+    createTimeOptions();
+    const now = new Date();
     fp = flatpickr("#targetDate", {
       locale: "ja", mode: "multiple", dateFormat: "Y/m/d",
-      minDate: minD, maxDate: maxD, conjunction: ", ",
-      disableMobile: true, // モバイルでも独自UIを強制
+      minDate: new Date(now.getFullYear(), now.getMonth() - 1, 1),
+      maxDate: new Date(now.getFullYear(), now.getMonth() + 2, 0),
+      conjunction: ", ", disableMobile: true,
       onDayCreate: function(dObj, dStr, fp, dayElem) {
         const date = dayElem.dateObj;
         const formatted = date.getFullYear() + '/' + ('0' + (date.getMonth() + 1)).slice(-2) + '/' + ('0' + date.getDate()).slice(-2);
@@ -138,7 +155,7 @@
       await liff.sendMessages([{ type: 'text', text: message }]);
       liff.closeWindow();
     } catch (error) {
-      alert("エラー: " + error);
+      alert("送信エラー");
       document.getElementById('submitBtn').disabled = false;
     }
   }
