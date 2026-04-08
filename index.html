@@ -15,7 +15,7 @@
     .status-bar { background: #fff9c4; padding: 10px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 15px; text-align: center; color: #856404; display: none; }
     .field { margin-bottom: 18px; }
     label { display: block; font-weight: 600; margin-bottom: 8px; color: #444; font-size: 0.9rem; }
-    input { width: 100%; padding: 12px; border: 1px solid #c2d1e5; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+    input { width: 100%; padding: 12px; border: 1px solid #c2d1e5; border-radius: 8px; box-sizing: border-box; font-size: 16px; background: #fff; }
     .type-selector { display: flex; gap: 10px; }
     .type-btn { flex: 1; padding: 12px; border: 1px solid #c2d1e5; background: #fff; border-radius: 8px; cursor: pointer; text-align: center; font-size: 14px; }
     .type-btn.active { background: #0056d2; color: #fff; border-color: #0056d2; font-weight: bold; }
@@ -37,7 +37,7 @@
 
     <div class="field">
       <label>勤務日（複数選択可）</label>
-      <input type="text" id="targetDate" placeholder="タップして日付を選択">
+      <input type="text" id="targetDate" placeholder="タップして日付を選択" readonly>
     </div>
 
     <div class="field">
@@ -55,17 +55,18 @@
         <span>〜</span>
         <input type="time" id="endTime" value="19:30" step="900">
       </div>
-      <div class="hint">※前月・今月・来月のみ選択可能です。</div>
+      <div class="hint">※前月・今月・来月のみ選択可能です。時間を空にすると削除。</div>
     </div>
 
-    <button type="button" class="main-btn" id="submitBtn" onclick="handleSubmit()">送信する</button>
+    <button type="button" class="main-btn" id="submitBtn" onclick="handleSubmit()">一括送信する</button>
     <div id="loading-overlay">送信中...</div>
   </form>
 </div>
 
 <script>
+  // ★設定項目：自分のものに書き換えてください
   const MY_LIFF_ID = "2008904530-lXx8C9i5"; 
-  const GAS_URL = "あなたのGASウェブアプリURL";
+  const GAS_URL = "あなたのGAS_ウェブアプリURL";
   
   let fp; 
   let submittedDates = [];
@@ -76,44 +77,30 @@
     document.getElementById('btn-remote').classList.toggle('active', val === 'リモート');
   }
 
-  // カレンダー移動範囲の計算（前月1日〜来月末日）
   const now = new Date();
-  const minDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const maxDate = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+  const minD = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const maxD = new Date(now.getFullYear(), now.getMonth() + 2, 0);
 
-  // ライブラリの読み込み完了を待ってから初期化
+  // カレンダーとLIFFの初期化
   document.addEventListener("DOMContentLoaded", function() {
-    initCalendar();
-    initLiff();
-  });
-
-  function initCalendar() {
     fp = flatpickr("#targetDate", {
-      locale: "ja",
-      mode: "multiple",
-      dateFormat: "Y/m/d",
-      minDate: minDate,
-      maxDate: maxDate,
-      conjunction: ", ",
-      disableMobile: "true", // モバイルでも独自カレンダーを強制表示
+      locale: "ja", mode: "multiple", dateFormat: "Y/m/d",
+      minDate: minD, maxDate: maxD, conjunction: ", ",
+      disableMobile: true, // モバイルでも独自UIを強制
       onDayCreate: function(dObj, dStr, fp, dayElem) {
         const date = dayElem.dateObj;
-        const formatted = date.getFullYear() + '/' + 
-                          ('0' + (date.getMonth() + 1)).slice(-2) + '/' + 
-                          ('0' + date.getDate()).slice(-2);
-        if (submittedDates.includes(formatted)) {
-          dayElem.classList.add("has-shift");
-        }
+        const formatted = date.getFullYear() + '/' + ('0' + (date.getMonth() + 1)).slice(-2) + '/' + ('0' + date.getDate()).slice(-2);
+        if (submittedDates.includes(formatted)) { dayElem.classList.add("has-shift"); }
       }
     });
-  }
+    initLiff();
+  });
 
   async function initLiff() {
     try {
       await liff.init({ liffId: MY_LIFF_ID });
-      if (!liff.isLoggedIn()) {
-        liff.login();
-      } else {
+      if (!liff.isLoggedIn()) { liff.login(); }
+      else {
         const userId = liff.getContext().userId;
         document.getElementById('userId').value = userId;
         loadCurrentShifts(userId);
@@ -140,7 +127,6 @@
     const type = document.getElementById('workType').value;
     
     if (!dates) { alert("日付を選択してください"); return; }
-
     document.getElementById('submitBtn').disabled = true;
     document.getElementById('loading-overlay').style.display = "block";
 
@@ -152,9 +138,8 @@
       await liff.sendMessages([{ type: 'text', text: message }]);
       liff.closeWindow();
     } catch (error) {
-      alert("送信エラー: " + error);
+      alert("エラー: " + error);
       document.getElementById('submitBtn').disabled = false;
-      document.getElementById('loading-overlay').style.display = "none";
     }
   }
 </script>
