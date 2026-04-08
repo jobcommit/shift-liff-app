@@ -35,7 +35,7 @@
 
 <div class="container">
   <h2 id="display-month">シフト管理</h2>
-  <div id="status-bar" class="status-bar">黄色い日は申請済みです</div>
+  <div id="status-bar" class="status-bar">黄色い日は提出済みです</div>
   
   <form id="shift-form">
     <input type="hidden" id="userId">
@@ -67,12 +67,12 @@
       <thead><tr><th>日付</th><th>内容</th></tr></thead>
       <tbody id="shift-list-body"></tbody>
     </table>
-    <div id="no-data" style="text-align:center; padding:20px; display:none; color:#999;">データがありません</div>
+    <div id="no-data" style="text-align:center; padding:20px; display:none; color:#999;">データ読み込み中...</div>
   </div>
 </div>
 
 <script>
-  // ★重要：ご自身のLIFF IDとGAS URLに書き換えてください
+  // ★重要：自分のものに書き換えてください
   const MY_LIFF_ID = "2008904530-lXx8C9i5"; 
   const GAS_URL = "あなたのGAS_ウェブアプリURL";
   
@@ -99,21 +99,15 @@
 
   document.addEventListener("DOMContentLoaded", function() {
     createTimeOptions();
-    
     const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
-    
-    document.getElementById('display-month').innerText = `シフト管理（${currentYear}/${currentMonth + 1}）`;
+    document.getElementById('display-month').innerText = `シフト管理（${now.getFullYear()}/${now.getMonth() + 1}）`;
 
-    // 範囲：先月1日〜来月末日を自動計算
-    const minDate = new Date(currentYear, currentMonth - 1, 1);
-    const maxDate = new Date(currentYear, currentMonth + 2, 0);
+    const minDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const maxDate = new Date(now.getFullYear(), now.getMonth() + 2, 0);
 
     fp = flatpickr("#targetDate", {
       locale: "ja", mode: "multiple", dateFormat: "Y/m/d",
-      minDate: minDate,
-      maxDate: maxDate,
+      minDate: minDate, maxDate: maxDate,
       conjunction: ", ", disableMobile: true,
       onDayCreate: function(dObj, dStr, fp, dayElem) {
         const d = dayElem.dateObj;
@@ -146,13 +140,21 @@
         if(fp) fp.redraw();
       }
       renderTable(data.details || []);
-    } catch (err) { console.error(err); }
+    } catch (err) { 
+        console.error(err);
+        document.getElementById('no-data').innerText = "データの取得に失敗しました。";
+        document.getElementById('no-data').style.display = "block";
+    }
   }
 
   function renderTable(details) {
     const body = document.getElementById('shift-list-body');
     body.innerHTML = "";
-    if (details.length === 0) { document.getElementById('no-data').style.display = "block"; return; }
+    if (details.length === 0) { 
+        document.getElementById('no-data').innerText = "登録されたデータがありません。";
+        document.getElementById('no-data').style.display = "block"; 
+        return; 
+    }
     document.getElementById('no-data').style.display = "none";
     details.forEach(item => {
       const tr = document.createElement('tr');
