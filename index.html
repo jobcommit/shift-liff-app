@@ -3,94 +3,157 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>シフト申請フォーム</title>
+  <title>シフト管理システム</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <style>
     body { font-family: sans-serif; margin: 0; padding: 20px 15px; background-color: #e6f2ff; color: #333; }
-    .container { max-width: 450px; margin: auto; background: #ffffff; padding: 30px 20px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0, 86, 210, 0.1); }
-    h2 { text-align: center; color: #0056d2; margin-bottom: 25px; font-size: 1.4rem; }
-    .field { margin-bottom: 20px; }
-    label { display: block; font-weight: 600; margin-bottom: 8px; color: #444; }
-    input { width: 100%; padding: 14px; border: 1px solid #c2d1e5; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
-    .time-group { display: flex; gap: 10px; align-items: center; }
-    .hint { font-size: 0.8rem; color: #666; margin-top: 5px; line-height: 1.4; }
-    button { width: 100%; padding: 16px; background: #0056d2; color: white; border: none; border-radius: 30px; font-size: 17px; font-weight: bold; cursor: pointer; margin-top: 15px; }
-    #loading { display: none; text-align: center; margin-top: 20px; color: #0056d2; font-weight: bold; }
+    .container { max-width: 450px; margin: auto; background: #ffffff; padding: 25px 20px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+    h2 { text-align: center; color: #0056d2; margin-bottom: 20px; font-size: 1.4rem; }
+    .status-bar { background: #fff9c4; padding: 10px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 15px; text-align: center; color: #856404; display: none; }
+    .field { margin-bottom: 18px; }
+    label { display: block; font-weight: 600; margin-bottom: 8px; color: #444; font-size: 0.9rem; }
+    input, select { width: 100%; padding: 12px; border: 1px solid #c2d1e5; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+    
+    /* 勤務区分ボタン */
+    .type-selector { display: flex; gap: 10px; }
+    .type-btn { flex: 1; padding: 12px; border: 1px solid #c2d1e5; background: #fff; border-radius: 8px; cursor: pointer; text-align: center; font-size: 14px; transition: 0.2s; }
+    .type-btn.active { background: #0056d2; color: #fff; border-color: #0056d2; font-weight: bold; }
+    
+    .hint { font-size: 0.75rem; color: #666; margin-top: 5px; line-height: 1.4; }
+    button.main-btn { width: 100%; padding: 16px; background: #0056d2; color: white; border: none; border-radius: 30px; font-size: 17px; font-weight: bold; margin-top: 20px; cursor: pointer; }
+    button:disabled { background: #ccc; }
+
+    /* カレンダーの入力済みマーク */
+    .has-shift { background: #ffeb3b !important; border-radius: 50% !important; font-weight: bold !important; color: #000 !important; }
+    #loading-overlay { display: none; text-align: center; padding: 10px; color: #0056d2; font-weight: bold; }
   </style>
 </head>
 <body>
 
 <div class="container">
-  <h2>シフト一括申請・削除</h2>
+  <h2>シフト管理・確認</h2>
+  <div id="status-bar" class="status-bar">黄色い日は提出済みです</div>
+  
   <form id="shift-form">
     <input type="hidden" id="userId">
+    <input type="hidden" id="workType" value="出社">
 
     <div class="field">
       <label>勤務日（複数選択可）</label>
       <input type="text" id="targetDate" placeholder="タップして日付を選択" readonly>
-      <div class="hint">※複数日選ぶと同じ時間が一括入力されます。</div>
+    </div>
+
+    <div class="field">
+      <label>勤務区分</label>
+      <div class="type-selector">
+        <div id="btn-office" class="type-btn active" onclick="setType('出社')">出社</div>
+        <div id="btn-remote" class="type-btn" onclick="setType('リモート')">リモート</div>
+      </div>
     </div>
 
     <div class="field">
       <label>勤務時間</label>
-      <div class="time-group">
-        <input type="time" id="startTime">
+      <div style="display:flex; gap:10px; align-items:center;">
+        <input type="time" id="startTime" value="10:00">
         <span>〜</span>
-        <input type="time" id="endTime">
+        <input type="time" id="endTime" value="19:30">
       </div>
-      <div class="hint">※時間を空欄にして送信すると、選択した日のシフトが<b>削除</b>されます。</div>
+      <div class="hint">※時間を空欄にして送ると、選択した日のシフトを<b>削除</b>します。</div>
     </div>
 
-    <button type="button" id="submitBtn" onclick="handleSubmit()">一括送信する</button>
-    <div id="loading">送信中...</div>
+    <button type="button" class="main-btn" id="submitBtn" onclick="handleSubmit()">一括送信する</button>
+    <div id="loading-overlay">処理中...</div>
   </form>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
 <script>
-  // ★あなたのLIFF IDに書き換えてください
   const MY_LIFF_ID = "2008904530-lXx8C9i5"; 
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbwaBCK6fR_OOMFxMdEs9Axh_TLpLk_3tp7jLZKzTYmPJSv5nmA8t8ewwoXSIZ579GA/exec";
+  let submittedDates = [];
 
-  window.onload = function() {
-    // 複数選択モード(multiple)でカレンダーを初期化
-    flatpickr("#targetDate", { 
-      locale: "ja", 
-      dateFormat: "Y/m/d", 
-      minDate: "today",
-      mode: "multiple",
-      conjunction: ", "
-    });
+  // 勤務区分の切り替え
+  function setType(val) {
+    document.getElementById('workType').value = val;
+    document.getElementById('btn-office').classList.toggle('active', val === '出社');
+    document.getElementById('btn-remote').classList.toggle('active', val === 'リモート');
+  }
 
-    liff.init({ liffId: MY_LIFF_ID })
-      .then(() => {
-        if (!liff.isLoggedIn()) { liff.login(); }
-        else { document.getElementById('userId').value = liff.getContext().userId; }
-      });
+  window.onload = async function() {
+    try {
+      await liff.init({ liffId: MY_LIFF_ID });
+      if (!liff.isLoggedIn()) {
+        liff.login();
+      } else {
+        const userId = liff.getContext().userId;
+        document.getElementById('userId').value = userId;
+        // 現在の提出状況を取得
+        loadCurrentShifts(userId);
+      }
+    } catch (err) { console.error(err); }
   };
+
+  // GASから提出済みのシフト日を取得
+  async function loadCurrentShifts(userId) {
+    try {
+      const response = await fetch(`${GAS_URL}?userId=${userId}`);
+      const data = await response.json();
+      submittedDates = data.dates || [];
+      if (submittedDates.length > 0) {
+        document.getElementById('status-bar').style.display = 'block';
+      }
+      initCalendar();
+    } catch (err) {
+      console.error("データ取得失敗", err);
+      initCalendar();
+    }
+  }
+
+  function initCalendar() {
+    flatpickr("#targetDate", {
+      locale: "ja",
+      mode: "multiple",
+      dateFormat: "Y/m/d",
+      minDate: "today",
+      conjunction: ", ",
+      onDayCreate: function(dObj, dStr, fp, dayElem) {
+        // yyyy/mm/dd 形式に変換して比較
+        const date = dayElem.dateObj;
+        const formatted = date.getFullYear() + '/' + 
+                          ('0' + (date.getMonth() + 1)).slice(-2) + '/' + 
+                          ('0' + date.getDate()).slice(-2);
+        if (submittedDates.includes(formatted)) {
+          dayElem.classList.add("has-shift");
+        }
+      }
+    });
+  }
 
   async function handleSubmit() {
     const dates = document.getElementById('targetDate').value;
     const start = document.getElementById('startTime').value;
     const end = document.getElementById('endTime').value;
+    const type = document.getElementById('workType').value;
     
     if (!dates) { alert("日付を選択してください"); return; }
 
     document.getElementById('submitBtn').disabled = true;
-    document.getElementById('loading').style.display = "block";
+    document.getElementById('loading-overlay').style.display = "block";
 
-    // 時間がどちらか空なら「削除」という文字列にする
-    const timeRange = (start === "" || end === "") ? "削除" : `${start}-${end}`;
+    // 削除か登録かの判定
+    const isDelete = (start === "" || end === "");
+    const timeRange = isDelete ? "削除" : `${type}(${start}-${end})`;
     const message = `【シフト一括】\n日付:${dates}\n時間:${timeRange}`;
 
     try {
       await liff.sendMessages([{ type: 'text', text: message }]);
       liff.closeWindow();
     } catch (error) {
-      alert("エラー: " + error);
+      alert("送信エラー: " + error);
       document.getElementById('submitBtn').disabled = false;
-      document.getElementById('loading').style.display = "none";
+      document.getElementById('loading-overlay').style.display = "none";
     }
   }
 </script>
